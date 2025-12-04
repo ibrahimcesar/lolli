@@ -1,0 +1,15 @@
+[package]
+name = "lolli-core"
+description = "Core data structures for the Lolli linear logic workbench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+authors.workspace = true
+readme = "README.md"
+
+[dependencies]
+thiserror.workspace = true

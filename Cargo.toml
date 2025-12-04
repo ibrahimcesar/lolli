@@ -1,0 +1,40 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/lolli-core",
+    "crates/lolli-parse",
+    "crates/lolli-prove",
+    "crates/lolli-extract",
+    "crates/lolli-codegen",
+    "crates/lolli-viz",
+    "crates/lolli-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/ibrahimcesar/lolli"
+homepage = "https://github.com/ibrahimcesar/lolli"
+readme = "README.md"
+keywords = ["linear-logic", "proof", "type-theory", "rust", "curry-howard"]
+categories = ["science", "development-tools", "compilers"]
+authors = ["Ibrahim Cesar <email@ibrahimcesar.com>"]
+
+[workspace.dependencies]
+# Internal crates
+lolli-core = { version = "0.1.0", path = "crates/lolli-core" }
+lolli-parse = { version = "0.1.0", path = "crates/lolli-parse" }
+lolli-prove = { version = "0.1.0", path = "crates/lolli-prove" }
+lolli-extract = { version = "0.1.0", path = "crates/lolli-extract" }
+lolli-codegen = { version = "0.1.0", path = "crates/lolli-codegen" }
+lolli-viz = { version = "0.1.0", path = "crates/lolli-viz" }
+
+# External dependencies
+thiserror = "1.0"
+pest = "2.7"
+pest_derive = "2.7"
+petgraph = "0.6"
+clap = { version = "4.4", features = ["derive"] }
+colored = "2.1"
+rustyline = "14.0"
