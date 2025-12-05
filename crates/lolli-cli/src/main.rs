@@ -249,51 +249,54 @@ fn main() {
                     println!("  {}", s.pretty());
                     println!();
 
-                    // Show the type that would be generated
-                    use lolli_codegen::RustCodegen;
-                    let codegen = RustCodegen::new();
+                    // Convert to one-sided and prove
+                    let one_sided = s.to_one_sided();
+                    let mut prover = Prover::new(100);
 
-                    println!("{}", "Type signature:".cyan().bold());
-                    if !s.antecedent.is_empty() {
-                        let args: Vec<String> = s
-                            .antecedent
-                            .iter()
-                            .map(|f| codegen.formula_to_type(f))
-                            .collect();
-                        print!("  fn f(");
-                        for (i, arg) in args.iter().enumerate() {
-                            if i > 0 {
-                                print!(", ");
+                    match prover.prove(&one_sided) {
+                        Some(proof) => {
+                            println!("{}", "✓ Provable".green());
+                            println!();
+
+                            // Extract term from proof
+                            let term = extract_term(&proof);
+
+                            // Generate code
+                            use lolli_codegen::RustCodegen;
+                            let mut codegen = RustCodegen::new();
+
+                            let code = if output.is_some() {
+                                // Full module with prelude
+                                codegen.generate_module("generated", &s, &term)
+                            } else {
+                                // Just the function
+                                codegen.generate_function("f", &s, &term)
+                            };
+
+                            println!("{}", "Generated Rust code:".cyan().bold());
+                            println!();
+                            for line in code.lines() {
+                                println!("{}", line);
                             }
-                            print!("arg{}: {}", i, arg);
-                        }
-                        print!(")");
-                    } else {
-                        print!("  fn f()");
-                    }
 
-                    if !s.succedent.is_empty() {
-                        let ret: Vec<String> = s
-                            .succedent
-                            .iter()
-                            .map(|f| codegen.formula_to_type(f))
-                            .collect();
-                        if ret.len() == 1 {
-                            println!(" -> {}", ret[0]);
-                        } else {
-                            println!(" -> ({})", ret.join(", "));
+                            // Write to file if output specified
+                            if let Some(path) = output {
+                                match std::fs::write(&path, &code) {
+                                    Ok(_) => {
+                                        println!();
+                                        println!("{} {}", "Written to:".green(), path);
+                                    }
+                                    Err(e) => {
+                                        eprintln!("{} Failed to write file: {}", "Error:".red().bold(), e);
+                                    }
+                                }
+                            }
                         }
-                    } else {
-                        println!();
+                        None => {
+                            println!("{}", "✗ NOT PROVABLE".red().bold());
+                            println!("  Cannot generate code from unprovable sequent");
+                        }
                     }
-
-                    println!();
-                    println!(
-                        "{}",
-                        format!("(Full codegen not yet implemented - output: {:?})", output)
-                            .yellow()
-                    );
-                    println!("  See Issues #15-17 for code generation implementation");
                 }
                 Err(e) => {
                     eprintln!("{} {}", "Error:".red().bold(), e);
