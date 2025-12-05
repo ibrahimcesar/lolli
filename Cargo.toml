@@ -11,7 +11,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/ibrahimcesar/lolli"
@@ -23,12 +23,12 @@ authors = ["Ibrahim Cesar <email@ibrahimcesar.com>"]
 
 [workspace.dependencies]
 # Internal crates
-lolli-core = { version = "0.1.0", path = "crates/lolli-core" }
-lolli-parse = { version = "0.1.0", path = "crates/lolli-parse" }
-lolli-prove = { version = "0.1.0", path = "crates/lolli-prove" }
-lolli-extract = { version = "0.1.0", path = "crates/lolli-extract" }
-lolli-codegen = { version = "0.1.0", path = "crates/lolli-codegen" }
-lolli-viz = { version = "0.1.0", path = "crates/lolli-viz" }
+lolli-core = { version = "0.2.0", path = "crates/lolli-core" }
+lolli-parse = { version = "0.2.0", path = "crates/lolli-parse" }
+lolli-prove = { version = "0.2.0", path = "crates/lolli-prove" }
+lolli-extract = { version = "0.2.0", path = "crates/lolli-extract" }
+lolli-codegen = { version = "0.2.0", path = "crates/lolli-codegen" }
+lolli-viz = { version = "0.2.0", path = "crates/lolli-viz" }
 
 # External dependencies
 thiserror = "1.0"
