@@ -89,28 +89,6 @@ impl TreeRenderer {
     }
 }
 
-/// Render a proof with custom options.
-pub struct TreeRenderOptions {
-    /// Use Unicode characters
-    pub unicode: bool,
-    /// Show rule names
-    pub show_rules: bool,
-    /// Maximum width before wrapping
-    pub max_width: Option<usize>,
-    /// Color theme (for terminal output)
-    pub colors: bool,
-}
-
-impl Default for TreeRenderOptions {
-    fn default() -> Self {
-        Self {
-            unicode: true,
-            show_rules: true,
-            max_width: None,
-            colors: false,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

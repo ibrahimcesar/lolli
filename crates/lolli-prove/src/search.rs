@@ -1,6 +1,14 @@
 //! Proof search implementation.
 //!
-//! This module implements focused proof search for MALL (Multiplicative-Additive Linear Logic).
+//! This module implements focused proof search for MALL (Multiplicative-Additive Linear Logic)
+//! with support for MELL (Multiplicative-Exponential Linear Logic) exponentials.
+//!
+//! ## Exponential Rules
+//!
+//! - **Promotion** (!): Requires context to be entirely unrestricted
+//! - **Dereliction**: Use an unrestricted formula linearly
+//! - **Contraction**: Duplicate an unrestricted formula
+//! - **Weakening**: Discard an unrestricted formula
 
 use lolli_core::{Formula, Proof, Rule, Sequent, TwoSidedSequent};
 use std::collections::HashSet;
@@ -260,6 +268,109 @@ impl Prover {
             }
         }
 
+        // Try using unrestricted formulas (exponentials)
+        if !seq.unrestricted.is_empty() {
+            // Try dereliction: bring an unrestricted formula into linear context
+            if let Some(proof) = self.try_dereliction(seq, depth) {
+                return Some(proof);
+            }
+
+            // Try contraction: duplicate an unrestricted formula
+            if let Some(proof) = self.try_contraction(seq, depth) {
+                return Some(proof);
+            }
+
+            // Try weakening: discard unused unrestricted formulas
+            if let Some(proof) = self.try_weakening(seq, depth) {
+                return Some(proof);
+            }
+        }
+
+        None
+    }
+
+    /// Try dereliction: move a formula from unrestricted to linear zone.
+    fn try_dereliction(&mut self, seq: &Sequent, depth: usize) -> Option<Proof> {
+        for i in 0..seq.unrestricted.len() {
+            let formula = &seq.unrestricted[i];
+
+            // Add the formula to linear zone (keeping it in unrestricted for potential reuse)
+            let mut new_linear = seq.linear.clone();
+            new_linear.push(formula.clone());
+
+            // Remove from unrestricted (for this branch - it can be reused via contraction)
+            let mut new_unrestricted = seq.unrestricted.clone();
+            new_unrestricted.remove(i);
+
+            let new_seq = Sequent {
+                linear: new_linear,
+                unrestricted: new_unrestricted,
+                focus: None,
+            };
+
+            if let Some(premise) = self.prove_with_depth(&new_seq, depth + 1) {
+                return Some(Proof {
+                    conclusion: seq.clone(),
+                    rule: Rule::Dereliction,
+                    premises: vec![premise],
+                });
+            }
+        }
+        None
+    }
+
+    /// Try contraction: duplicate an unrestricted formula.
+    fn try_contraction(&mut self, seq: &Sequent, depth: usize) -> Option<Proof> {
+        for i in 0..seq.unrestricted.len() {
+            let formula = &seq.unrestricted[i];
+
+            // Add two copies to linear zone
+            let mut new_linear = seq.linear.clone();
+            new_linear.push(formula.clone());
+            new_linear.push(formula.clone());
+
+            // Remove from unrestricted
+            let mut new_unrestricted = seq.unrestricted.clone();
+            new_unrestricted.remove(i);
+
+            let new_seq = Sequent {
+                linear: new_linear,
+                unrestricted: new_unrestricted,
+                focus: None,
+            };
+
+            if let Some(premise) = self.prove_with_depth(&new_seq, depth + 1) {
+                return Some(Proof {
+                    conclusion: seq.clone(),
+                    rule: Rule::Contraction,
+                    premises: vec![premise],
+                });
+            }
+        }
+        None
+    }
+
+    /// Try weakening: discard an unrestricted formula.
+    fn try_weakening(&mut self, seq: &Sequent, depth: usize) -> Option<Proof> {
+        for i in 0..seq.unrestricted.len() {
+            // Remove the unrestricted formula (discard it)
+            let mut new_unrestricted = seq.unrestricted.clone();
+            new_unrestricted.remove(i);
+
+            let new_seq = Sequent {
+                linear: seq.linear.clone(),
+                unrestricted: new_unrestricted,
+                focus: None,
+            };
+
+            if let Some(premise) = self.prove_with_depth(&new_seq, depth + 1) {
+                return Some(Proof {
+                    conclusion: seq.clone(),
+                    rule: Rule::Weakening,
+                    premises: vec![premise],
+                });
+            }
+        }
         None
     }
 
@@ -433,6 +544,10 @@ impl Prover {
     /// Create a canonical key for a sequent (for caching).
     fn sequent_key(&self, seq: &Sequent) -> Vec<String> {
         let mut keys: Vec<String> = seq.linear.iter().map(|f| f.pretty()).collect();
+        // Include unrestricted formulas in cache key with a marker
+        for f in &seq.unrestricted {
+            keys.push(format!("?{}", f.pretty()));
+        }
         keys.sort();
         keys
     }
@@ -474,6 +589,7 @@ mod tests {
         Formula::atom(name)
     }
 
+    #[allow(dead_code)]
     fn neg_atom(name: &str) -> Formula {
         Formula::neg_atom(name)
     }
@@ -592,5 +708,97 @@ mod tests {
         let items = vec![1, 2];
         let splits = all_splits(&items);
         assert_eq!(splits.len(), 4); // 2^2 = 4 ways to split 2 items
+    }
+
+    // ===== Exponential Tests =====
+
+    #[test]
+    fn test_bang_identity() {
+        // !A ⊢ !A
+        let mut prover = Prover::new(100);
+        let seq = TwoSidedSequent::new(
+            vec![Formula::of_course(atom("A"))],
+            vec![Formula::of_course(atom("A"))],
+        );
+        let result = prover.prove_two_sided(&seq);
+        assert!(result.is_some(), "!A ⊢ !A should be provable");
+    }
+
+    #[test]
+    fn test_dereliction() {
+        // !A ⊢ A (use !A as A)
+        let mut prover = Prover::new(100);
+        let seq = TwoSidedSequent::new(
+            vec![Formula::of_course(atom("A"))],
+            vec![atom("A")],
+        );
+        let result = prover.prove_two_sided(&seq);
+        assert!(result.is_some(), "!A ⊢ A should be provable via dereliction");
+    }
+
+    #[test]
+    fn test_contraction() {
+        // !A ⊢ A ⊗ A (use A twice via contraction)
+        let mut prover = Prover::new(100);
+        let seq = TwoSidedSequent::new(
+            vec![Formula::of_course(atom("A"))],
+            vec![Formula::tensor(atom("A"), atom("A"))],
+        );
+        let result = prover.prove_two_sided(&seq);
+        assert!(result.is_some(), "!A ⊢ A ⊗ A should be provable via contraction");
+    }
+
+    #[test]
+    fn test_weakening_exponential() {
+        // !A ⊢ 1 (discard !A)
+        let mut prover = Prover::new(100);
+        let seq = TwoSidedSequent::new(
+            vec![Formula::of_course(atom("A"))],
+            vec![Formula::One],
+        );
+        let result = prover.prove_two_sided(&seq);
+        assert!(result.is_some(), "!A ⊢ 1 should be provable via weakening");
+    }
+
+    #[test]
+    fn test_no_contraction_without_bang() {
+        // A ⊢ A ⊗ A should NOT be provable (no exponential)
+        let mut prover = Prover::new(100);
+        let seq = TwoSidedSequent::new(
+            vec![atom("A")],
+            vec![Formula::tensor(atom("A"), atom("A"))],
+        );
+        let result = prover.prove_two_sided(&seq);
+        assert!(result.is_none(), "A ⊢ A ⊗ A should NOT be provable without !");
+    }
+
+    #[test]
+    fn test_bang_tensor() {
+        // !A ⊢ !A ⊗ !A (via contraction and promotion)
+        let mut prover = Prover::new(100);
+        let seq = TwoSidedSequent::new(
+            vec![Formula::of_course(atom("A"))],
+            vec![Formula::tensor(
+                Formula::of_course(atom("A")),
+                Formula::of_course(atom("A")),
+            )],
+        );
+        let result = prover.prove_two_sided(&seq);
+        assert!(result.is_some(), "!A ⊢ !A ⊗ !A should be provable");
+    }
+
+    #[test]
+    fn test_multiple_uses() {
+        // !A ⊢ A ⊗ A ⊗ A (use A three times)
+        let mut prover = Prover::new(100);
+        let seq = TwoSidedSequent::new(
+            vec![Formula::of_course(atom("A"))],
+            vec![Formula::tensor(
+                atom("A"),
+                Formula::tensor(atom("A"), atom("A")),
+            )],
+        );
+        let result = prover.prove_two_sided(&seq);
+        assert!(result.is_some(), "!A ⊢ A ⊗ A ⊗ A should be provable");
     }
 }
